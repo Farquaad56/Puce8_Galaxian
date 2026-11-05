@@ -21,3 +21,5 @@ pub mod audio;
 pub mod board;
 
 pub mod machine;
+
+pub mod trace;
