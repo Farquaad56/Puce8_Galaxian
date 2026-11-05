@@ -1,0 +1,7 @@
+/target
+/roms/
+/golden/*.log
+/golden/*.png
+/golden/*.wav
+/golden/*.zst
+*.zip

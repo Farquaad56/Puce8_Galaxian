@@ -1,0 +1,7 @@
+; Script débogueur MAME 0.287 : trace CPU (C) et accès bus 5000-7FFF (B) dans un seul fichier.
+; Lancement : mame.exe galaxian -debug -debugscript tools/mame/trace.dbg ...
+; Symboles vérifiés dans debugcpu.cpp : frame, beamy, beamx, totalcycles, wpaddr, wpdata.
+trace golden/mame_raw.log,,noloop,{tracelog "C %d %d %d %d %04X %04X %04X %04X %04X %04X %04X %04X\n",frame,beamy,beamx,totalcycles,pc,af,bc,de,hl,ix,iy,sp}
+wpset 5000,3000,r,1,{tracelog "B %d %d %d R %04X %02X %04X\n",frame,beamy,beamx,wpaddr,wpdata,pc}
+wpset 5000,3000,w,1,{tracelog "B %d %d %d W %04X %02X %04X\n",frame,beamy,beamx,wpaddr,wpdata,pc}
+go

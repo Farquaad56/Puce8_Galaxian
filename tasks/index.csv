@@ -1,0 +1,50 @@
+key,title,priority,parents,file
+T001,"Dépôt : Cargo.toml racine, .gitignore, premier commit",100,,docs/tasks/T001.md
+T002,Crate galaxian-core : Cargo.toml et lib.rs vide,99,T001,docs/tasks/T002.md
+T003,"Crate galaxian-cli : Cargo.toml, lib.rs et main.rs provisoires",98,T002,docs/tasks/T003.md
+T004,Core : consts.rs (constantes de timing et d'écran),97,T003,docs/tasks/T004.md
+T005,Core : crc.rs (CRC32),96,T004,docs/tasks/T005.md
+T006,Core : rom.rs (chargement et vérification de galaxian.zip),95,T005,docs/tasks/T006.md
+T007,Core : gfx.rs (décodage tuiles 8x8 et sprites 16x16),94,T006,docs/tasks/T007.md
+T008,"Core : palette.rs (résistances MAME, PROM, étoiles)",93,T007,docs/tasks/T008.md
+T009,Core : stars.rs (table LFSR des étoiles),92,T008,docs/tasks/T009.md
+T010,Core : input.rs (états d'entrée et scripts d'entrées),91,T009,docs/tasks/T010.md
+T011,Core : video/tiles.rs (rendu du fond de tuiles),90,T010,docs/tasks/T011.md
+T012,Core : video/sprites.rs (rendu des 8 sprites),89,T011,docs/tasks/T012.md
+T013,Core : video/bullets.rs (shells et missile),88,T012,docs/tasks/T013.md
+T014,Core : video/starfield.rs (rendu des étoiles),87,T013,docs/tasks/T014.md
+T015,"Core : video/mod.rs (struct Video, rendu partiel façon MAME) + vérification vidéo",86,T014,docs/tasks/T015.md
+T016,"Core : audio/noise.rs (LFSR de bruit, port de dss_lfsr_noise)",85,T015,docs/tasks/T016.md
+T017,"Core : audio/pitch.rs (compteur de pitch, port de dss_note)",84,T016,docs/tasks/T017.md
+T018,"Core : audio/mod.rs (Audio, SoundRegs, mélangeur v0) + vérification audio",83,T017,docs/tasks/T018.md
+T019,"Core : board/mod.rs (struct Board, horloge, vblank, watchdog)",82,T018,docs/tasks/T019.md
+T020,Core : board/bus.rs (impl Bus de puce-z80) + vérification board,81,T019,docs/tasks/T020.md
+T021,"Core : machine.rs (Cpu + Board, run_frame)",80,T020,docs/tasks/T021.md
+T022,"Core : trace.rs (formats des lignes C, B, V)",79,T021,docs/tasks/T022.md
+T023,Core : lib.rs final + test d'intégration real_rom + vérification du cœur,78,T022,docs/tasks/T023.md
+T024,CLI : args.rs (analyse d'arguments),77,T023,docs/tasks/T024.md
+T025,CLI : wav.rs (lecture/écriture WAV + comparaison),76,T024,docs/tasks/T025.md
+T026,CLI : diff.rs (comparateur de traces C/B/V avec tolérances),75,T025,docs/tasks/T026.md
+T027,CLI : rawcrc.rs (CRC32 des dumps vidéo bruts de MAME),74,T026,docs/tasks/T027.md
+T028,"CLI : run.rs (run, crc-frames, trace-cpu, trace-bus)",73,T027,docs/tasks/T028.md
+T029,CLI : main.rs final + build release + tests de tout le workspace,72,T028,docs/tasks/T029.md
+T030,Ancre 1 : 3 images de la ROM réelle (CRC vidéo et watchdog),71,T029,docs/tasks/T030.md
+T031,"Ancre 2 : trace CPU d'une image (6563 lignes, 24 premières exactes)",70,T030,docs/tasks/T031.md
+T032,"Ancre 3 : trace du bus d'une image (1310 lignes, 14 premières exactes)",69,T031,docs/tasks/T032.md
+T033,Ancre 4 : scénario d'entrées et 700 CRC vidéo (9 points de contrôle),68,T032,docs/tasks/T033.md
+T034,Golden : vérifier la présence des documents de format et de matériel,67,T033,docs/tasks/T034.md
+T035,Golden : scripts MAME (débogueur + Lua) et runner PowerShell,66,T034,docs/tasks/T035.md
+T036,"Golden : valider MAME 0.287, le romset et l'API Lua des ports",65,T035,docs/tasks/T036.md
+T037,Golden : valider la trace CPU MAME contre l'émulateur sur 3 images,64,T036,docs/tasks/T037.md
+T038,Golden : valider le dump vidéo MAME (taille brute et 60 CRC),63,T037,docs/tasks/T038.md
+T039,Golden : premier WAV MAME et comparaison de format avec l'émulateur,62,T038,docs/tasks/T039.md
+T040,"Campagne 1 : trace CPU 700 images, MAME contre émulateur (registres puis tstate)",61,T039,docs/tasks/T040.md
+T041,Campagne 2 : accès bus 700 images (contenu puis timing),60,T040,docs/tasks/T041.md
+T042,"Campagne 3 : CRC vidéo 700 images, MAME contre émulateur",59,T041,docs/tasks/T042.md
+T050,Mesure : date exacte des écritures 7004 (étoiles) vue par MAME et par l'émulateur,58,T042,docs/tasks/T050.md
+T070,"GUI : crate galaxian-gui (Cargo.toml, main.rs provisoire)",57,T050,docs/tasks/T070.md
+T071,GUI : keys.rs (touches clavier vers entrées de la machine),56,T070,docs/tasks/T071.md
+T072,"GUI : pacing.rs (cadencement 60,606 Hz)",55,T071,docs/tasks/T072.md
+T073,"GUI : app.rs (fenêtre egui, texture 768x224, boucle d'émulation)",54,T072,docs/tasks/T073.md
+T074,"GUI : main.rs final, build, tests et clippy",53,T073,docs/tasks/T074.md
+T075,"GUI : recette manuelle (affichage, pièce, partie, clavier)",52,T074,docs/tasks/T075.md
