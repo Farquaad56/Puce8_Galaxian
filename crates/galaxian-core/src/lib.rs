@@ -17,3 +17,5 @@ pub mod input;
 pub mod video;
 
 pub mod audio;
+
+pub mod board;
