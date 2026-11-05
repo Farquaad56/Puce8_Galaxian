@@ -13,3 +13,5 @@ pub mod palette;
 pub mod stars;
 
 pub mod input;
+
+pub mod video;
