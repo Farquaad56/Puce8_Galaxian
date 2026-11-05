@@ -1,0 +1,86 @@
+//! Fond (tilemap 32x32 de 8x8) avec scroll vertical par colonne.
+
+use super::Video;
+use crate::consts::*;
+
+impl Video {
+    pub(super) fn draw_tiles(&self, y: u32, line: &mut [u32; FB_WIDTH]) {
+        for (sx, px) in line.iter_mut().enumerate() {
+            let sxm = if self.flip_x { FB_WIDTH - 1 - sx } else { sx };
+            let col = sxm / 24;
+            let tx = (sxm % 24) / 3;
+            let scroll = i32::from(self.objram[col * 2]);
+            let p = if self.flip_y {
+                255 - ((y as i32 - scroll) & 255)
+            } else {
+                (y as i32 + scroll) & 255
+            } as usize;
+            let row = p / 8;
+            let ty = p % 8;
+            let code = self.vram[row * 32 + col] as usize;
+            let color = (self.objram[col * 2 + 1] & 7) as usize;
+            let pen = self.gfx.tiles[code][ty * 8 + tx] as usize;
+            if pen != 0 {
+                *px = self.palette[color * 4 + pen];
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::consts::*;
+    use crate::rom::RomSet;
+    use crate::video::Video;
+
+    fn video() -> Video {
+        let mut rom = RomSet::blank();
+        for i in 0..8 {
+            rom.gfx[8 + i] = 0xF0; // tuile 1 : pixels 0..3 en pen 3
+            rom.gfx[0x800 + 8 + i] = 0xF0;
+        }
+        rom.prom[3] = 0b0000_0111; // pen 3 de la couleur 0 = rouge
+        Video::new(&rom)
+    }
+
+    #[test]
+    fn tile_is_drawn_on_visible_row() {
+        let mut v = video();
+        v.vram[2 * 32] = 1; // rangée 2 = lignes pixmap 16..23 = lignes écran 16..23
+        v.start_frame();
+        v.finish_frame(1);
+        let red = v.palette[3];
+        assert_ne!(red, 0);
+        assert_eq!(v.fb[0], red);
+        assert_eq!(v.fb[11], red); // 4e pixel, dernier sous-pixel
+        assert_eq!(v.fb[12], 0); // 5e pixel transparent
+    }
+
+    #[test]
+    fn column_scroll_moves_tile_up() {
+        let mut v = video();
+        v.vram[2 * 32] = 1;
+        v.objram[0] = 8; // scroll colonne 0 = 8 : ligne écran y montre pixmap (y+8)
+        v.start_frame();
+        v.finish_frame(1);
+        // la tuile (pixmap 16..23) apparaît sur les lignes écran 8..15 : invisibles → ligne 16 vide
+        assert_eq!(v.fb[0], 0);
+        let mut v = video();
+        v.vram[3 * 32] = 1; // pixmap 24..31
+        v.objram[0] = 8;
+        v.start_frame();
+        v.finish_frame(1);
+        assert_ne!(v.fb[0], 0); // ligne écran 16 → pixmap 24 → rangée 3
+        assert_eq!(v.fb[FB_WIDTH * 8], 0); // ligne écran 24 → pixmap 32 → rangée 4 vide
+    }
+
+    #[test]
+    fn color_attribute_comes_from_odd_objram_of_the_column() {
+        let mut v = video();
+        v.vram[2 * 32] = 1;
+        v.objram[1] = 1; // couleur 1 pour la colonne 0
+        v.start_frame();
+        v.finish_frame(1);
+        assert_eq!(v.fb[0], v.palette[4 + 3]);
+    }
+}
