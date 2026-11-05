@@ -15,3 +15,5 @@ pub mod stars;
 pub mod input;
 
 pub mod video;
+
+pub mod audio;
