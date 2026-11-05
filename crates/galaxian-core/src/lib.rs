@@ -9,3 +9,5 @@ pub mod rom;
 pub mod gfx;
 
 pub mod palette;
+
+pub mod stars;
