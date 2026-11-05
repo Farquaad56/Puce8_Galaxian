@@ -5,3 +5,5 @@ pub mod consts;
 pub mod crc;
 
 pub mod rom;
+
+pub mod gfx;
