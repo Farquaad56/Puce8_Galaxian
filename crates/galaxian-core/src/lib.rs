@@ -19,3 +19,5 @@ pub mod video;
 pub mod audio;
 
 pub mod board;
+
+pub mod machine;
