@@ -11,3 +11,5 @@ pub mod gfx;
 pub mod palette;
 
 pub mod stars;
+
+pub mod input;
