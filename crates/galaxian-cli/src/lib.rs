@@ -7,3 +7,5 @@ pub mod wav;
 pub mod diff;
 
 pub mod rawcrc;
+
+pub mod run;
