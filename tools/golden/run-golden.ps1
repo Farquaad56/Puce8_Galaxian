@@ -1,4 +1,4 @@
-﻿<#
+<#
   Génère les golden logs avec MAME 0.287 puis les compare à l'émulateur.
   Usage : .\tools\golden\run-golden.ps1 -Frames 700 [-Inputs tools\inputs\anchor_play.txt] [-Mode cpu|video|all]
 #>
@@ -11,6 +11,10 @@ param(
   [string]$Cli = '.\target\release\puce8-galaxian.exe'
 )
 $ErrorActionPreference = 'Stop'
+# Configuration MAME vierge a chaque campagne : un DIP enregistre par l'utilisateur fausserait le golden.
+$cfgDir = Join-Path (Get-Location) 'golden\mamecfg'
+Remove-Item -Recurse -Force $cfgDir -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force $cfgDir | Out-Null
 $zip = Join-Path $RomPath 'galaxian.zip'
 New-Item -ItemType Directory -Force golden | Out-Null
 $env:GOLDEN_FRAMES = "$Frames"
@@ -23,7 +27,7 @@ if ($Mode -in 'cpu','all') {
   New-Item -ItemType Directory -Force (Join-Path $mameDir 'golden') | Out-Null
   Push-Location $mameDir
   & $Mame galaxian -rompath $RomPath -debug -debugscript (Join-Path $PSScriptRoot '..\mame\trace.dbg') `
-    -autoboot_script (Join-Path $PSScriptRoot '..\mame\golden.lua') -nothrottle -sound none -window -skip_gameinfo
+    -autoboot_script (Join-Path $PSScriptRoot '..\mame\golden.lua') -nothrottle -sound none -window -skip_gameinfo -cfg_directory $cfgDir
   Pop-Location
   # MAME écrit golden/mame_raw.log relativement à son dossier courant : on le ramène dans le dépôt.
   $raw = Join-Path $mameDir 'golden\mame_raw.log'
@@ -41,7 +45,7 @@ if ($Mode -in 'video','all') {
   $env:GOLDEN_VIDEO = (Join-Path (Get-Location) 'golden\mame_video.raw')
   Remove-Item $env:GOLDEN_VIDEO -ErrorAction SilentlyContinue
   & $Mame galaxian -rompath $RomPath -autoboot_script (Join-Path $PSScriptRoot '..\mame\golden.lua') `
-    -nothrottle -sound none -window -skip_gameinfo
+    -nothrottle -sound none -window -skip_gameinfo -cfg_directory $cfgDir
   & $Cli raw-crc golden\mame_video.raw --width 768 --height 224 --format bgra --out golden\mame_video.crc
   & $Cli crc-frames $zip --frames $Frames --inputs $Inputs --out golden\emu_video.crc
   Write-Host 'CRC vidéo MAME et émulateur générés dans golden\.'

@@ -35,6 +35,9 @@ pub const STAR_RNG_PERIOD: u32 = (1 << 17) - 1;
 /// soit 240 lignes de 192 T-states. Vérifié contre MAME 0.287 (vpos/hpos du débogueur et CRC vidéo).
 pub const SCREEN_PHASE_T: u32 = 240 * T_PER_LINE;
 
+/// Avance (en T-states) de la ligne NMI sur le début du VBLANK, calibrée sur la trace MAME 0.287.
+pub const NMI_LEAD_T: u32 = 1;
+
 #[cfg(test)]
 mod tests {
     use super::*;

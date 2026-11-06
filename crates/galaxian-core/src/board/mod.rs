@@ -120,9 +120,6 @@ impl Board {
         if self.watchdog_count >= 8 {
             self.watchdog_fired = true;
         }
-        if self.irq_enabled {
-            self.nmi_line = true;
-        }
     }
 
     fn irq_enable_w(&mut self, data: u8) {

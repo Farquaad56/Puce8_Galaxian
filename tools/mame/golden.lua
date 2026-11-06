@@ -48,15 +48,20 @@ end
 
 apply_inputs(0)
 -- register_frame_done : appeler screen:pixels() depuis add_machine_frame_notifier bloque MAME 0.287 après la 1re image.
+-- n = numero de VBLANK atteint, deduit du temps emulé (50688 T / 3,072 MHz = 16,5 ms par image) :
+-- en mode debogueur, le rappel peut etre appele plusieurs fois par image, un compteur serait faux.
+local last_n = -1
 emu.register_frame_done(function()
+  local n = math.floor(manager.machine.time:as_double() / 0.0165 + 0.5)
+  if n == last_n then return end
+  last_n = n
   if vf then
     local screen = manager.machine.screens[":screen"]
     local pixels = screen:pixels()
     vf:write(pixels)
   end
-  count = count + 1
-  apply_inputs(count)
-  if count >= frames then
+  apply_inputs(n)
+  if n >= frames - 1 then
     if vf then vf:close() end
     manager.machine:exit()
   end

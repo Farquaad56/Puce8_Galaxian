@@ -8,6 +8,8 @@ use puce_z80::Cpu;
 pub struct Machine {
     pub cpu: Cpu,
     pub board: Board,
+    /// La ligne de trace de l'état courant a déjà été émise (NMI : trace après acceptation).
+    traced: bool,
 }
 
 impl Machine {
@@ -21,6 +23,7 @@ impl Machine {
         Machine {
             cpu,
             board: Board::new(rom),
+            traced: false,
         }
     }
 
@@ -34,8 +37,25 @@ impl Machine {
     pub fn run_frame_hook(&mut self, hook: &mut dyn FnMut(&Machine)) {
         self.board.vblank_flag = false;
         while !self.board.vblank_flag {
-            hook(self);
+            // Le débogueur MAME trace APRÈS l'acceptation d'une NMI (première instruction du
+            // gestionnaire) : si la NMI va être prise à cette frontière, on trace après le pas.
+            let nmi_taken = self.nmi_will_be_taken();
+            if !nmi_taken && !self.traced {
+                hook(self);
+            }
             self.step();
+            self.traced = nmi_taken;
+            if nmi_taken {
+                hook(self);
+            }
+        }
+    }
+
+    /// Vrai si le prochain `step` démarre la séquence d'acceptation de la NMI.
+    fn nmi_will_be_taken(&mut self) -> bool {
+        match self.cpu.save_state() {
+            Some(st) => st.nmi_latch || (puce_z80::Bus::nmi(&mut self.board) && !st.nmi_prev),
+            None => false,
         }
     }
 

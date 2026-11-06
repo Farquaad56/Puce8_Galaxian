@@ -92,6 +92,12 @@ impl Bus for Board {
         if ft == 0 {
             self.video.start_frame();
         }
+        // Calibrage MAME 0.287 : la NMI est visible à la frontière d'instruction qui précède d'un
+        // T-state le début du VBLANK (cas observé : instruction terminée à t, VBLANK à t+1,
+        // NMI prise avant l'instruction suivante).
+        if ft + NMI_LEAD_T == VBLANK_START_LINE * T_PER_LINE && self.irq_enabled {
+            self.nmi_line = true;
+        }
         if ft == VBLANK_START_LINE * T_PER_LINE {
             self.vblank_start();
         }
