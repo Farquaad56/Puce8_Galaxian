@@ -1,0 +1,190 @@
+//! Comparaison de deux fichiers de trace (lignes `C`, `B`, `V`) : stoppe au premier écart.
+
+pub struct DiffOptions {
+    /// Tolérance sur la colonne `tstate` des lignes `C` (None = colonne ignorée).
+    pub tol_tstate: Option<i64>,
+    /// Tolérance sur `hpos` des lignes `B` (None = ignorée).
+    pub tol_hpos: Option<i64>,
+    /// Comparer `vpos` des lignes `B`.
+    pub check_vpos: bool,
+    /// Comparer la colonne `pc` des lignes `B` (à désactiver face à MAME).
+    pub check_pc: bool,
+}
+
+impl Default for DiffOptions {
+    fn default() -> Self {
+        DiffOptions {
+            tol_tstate: None,
+            tol_hpos: None,
+            check_vpos: true,
+            check_pc: true,
+        }
+    }
+}
+
+fn num(s: &str) -> i64 {
+    s.parse().unwrap_or(i64::MIN)
+}
+
+/// Compare une paire de lignes ; `Err(raison)` au premier champ différent.
+pub fn compare_line(a: &str, b: &str, o: &DiffOptions) -> Result<(), String> {
+    let ta: Vec<&str> = a.split_whitespace().collect();
+    let tb: Vec<&str> = b.split_whitespace().collect();
+    if ta.first() != tb.first() {
+        return Err("types de ligne différents".into());
+    }
+    match ta.first().copied() {
+        Some("C") => {
+            if ta.len() != 13 || tb.len() != 13 {
+                return Err("ligne C : 13 champs attendus".into());
+            }
+            if ta[5..13] != tb[5..13] {
+                return Err("registres différents (pc af bc de hl ix iy sp)".into());
+            }
+            if let Some(t) = o.tol_tstate {
+                if (num(ta[4]) - num(tb[4])).abs() > t {
+                    return Err(format!("tstate {} vs {} (tolérance {t})", ta[4], tb[4]));
+                }
+            }
+            Ok(())
+        }
+        Some("B") => {
+            if ta.len() != 8 || tb.len() != 8 {
+                return Err("ligne B : 8 champs attendus".into());
+            }
+            if ta[4..7] != tb[4..7] || (o.check_pc && ta[7] != tb[7]) {
+                return Err("accès différent (R/W addr data pc)".into());
+            }
+            if o.check_vpos && ta[2] != tb[2] {
+                return Err(format!("vpos {} vs {}", ta[2], tb[2]));
+            }
+            if let Some(t) = o.tol_hpos {
+                if (num(ta[3]) - num(tb[3])).abs() > t {
+                    return Err(format!("hpos {} vs {} (tolérance {t})", ta[3], tb[3]));
+                }
+            }
+            Ok(())
+        }
+        Some("V") => {
+            if ta.len() != 3 || tb.len() != 3 {
+                return Err("ligne V : 3 champs attendus".into());
+            }
+            if ta[1] != tb[1] || !ta[2].eq_ignore_ascii_case(tb[2]) {
+                return Err(format!(
+                    "image {} crc {} vs image {} crc {}",
+                    ta[1], ta[2], tb[1], tb[2]
+                ));
+            }
+            Ok(())
+        }
+        _ => Err("type de ligne inconnu".into()),
+    }
+}
+
+/// Compare deux textes ; retourne le nombre de lignes comparées ou un rapport d'écart.
+pub fn compare_text(a: &str, b: &str, o: &DiffOptions) -> Result<usize, String> {
+    let la: Vec<&str> = a.lines().filter(|l| !l.trim().is_empty()).collect();
+    let lb: Vec<&str> = b.lines().filter(|l| !l.trim().is_empty()).collect();
+    let n = la.len().min(lb.len());
+    for i in 0..n {
+        if let Err(why) = compare_line(la[i], lb[i], o) {
+            let from = i.saturating_sub(5);
+            let mut rep = format!("ÉCART ligne {} : {why}\n", i + 1);
+            for j in from..=i {
+                rep.push_str(&format!(
+                    "  a[{}]: {}\n  b[{}]: {}\n",
+                    j + 1,
+                    la[j],
+                    j + 1,
+                    lb[j]
+                ));
+            }
+            return Err(rep);
+        }
+    }
+    if la.len() != lb.len() {
+        return Err(format!(
+            "longueurs différentes : {} vs {} lignes (les {} premières sont identiques)",
+            la.len(),
+            lb.len(),
+            n
+        ));
+    }
+    Ok(n)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const C1: &str = "C 0 1 2 100 0010 0001 0002 0003 0004 0005 0006 FFFF";
+
+    #[test]
+    fn identical_cpu_lines_match_ignoring_time() {
+        let c2 = "C 9 9 9 999 0010 0001 0002 0003 0004 0005 0006 FFFF";
+        assert!(compare_line(C1, c2, &DiffOptions::default()).is_ok());
+    }
+
+    #[test]
+    fn register_difference_is_reported() {
+        let c2 = "C 0 1 2 100 0011 0001 0002 0003 0004 0005 0006 FFFF";
+        assert!(compare_line(C1, c2, &DiffOptions::default()).is_err());
+    }
+
+    #[test]
+    fn tstate_tolerance() {
+        let c2 = "C 0 1 2 103 0010 0001 0002 0003 0004 0005 0006 FFFF";
+        let o = DiffOptions {
+            tol_tstate: Some(2),
+            ..Default::default()
+        };
+        assert!(compare_line(C1, c2, &o).is_err());
+        let o = DiffOptions {
+            tol_tstate: Some(3),
+            ..Default::default()
+        };
+        assert!(compare_line(C1, c2, &o).is_ok());
+    }
+
+    #[test]
+    fn bus_lines_check_vpos_and_hpos() {
+        let b1 = "B 0 100 50 W 7001 01 1234";
+        let b2 = "B 0 100 56 W 7001 01 1234";
+        assert!(compare_line(b1, b2, &DiffOptions::default()).is_ok());
+        let o = DiffOptions {
+            tol_hpos: Some(5),
+            ..Default::default()
+        };
+        assert!(compare_line(b1, b2, &o).is_err());
+        let b3 = "B 0 101 50 W 7001 01 1234";
+        assert!(compare_line(b1, b3, &DiffOptions::default()).is_err());
+    }
+
+    #[test]
+    fn bus_pc_can_be_ignored() {
+        let b1 = "B 0 100 50 W 7001 01 1234";
+        let b2 = "B 0 100 50 W 7001 01 1236";
+        assert!(compare_line(b1, b2, &DiffOptions::default()).is_err());
+        let o = DiffOptions {
+            check_pc: false,
+            ..Default::default()
+        };
+        assert!(compare_line(b1, b2, &o).is_ok());
+    }
+
+    #[test]
+    fn video_crc_case_insensitive() {
+        assert!(compare_line("V 3 abcdef01", "V 3 ABCDEF01", &DiffOptions::default()).is_ok());
+        assert!(compare_line("V 3 abcdef01", "V 4 ABCDEF01", &DiffOptions::default()).is_err());
+    }
+
+    #[test]
+    fn text_comparison_reports_first_difference_with_context() {
+        let a = format!("{C1}\n{C1}\n");
+        let b = format!("{C1}\nC 0 1 2 100 0011 0001 0002 0003 0004 0005 0006 FFFF\n");
+        let e = compare_text(&a, &b, &DiffOptions::default()).unwrap_err();
+        assert!(e.contains("ligne 2"));
+        assert_eq!(compare_text(&a, &a, &DiffOptions::default()), Ok(2));
+        assert!(compare_text(&a, C1, &DiffOptions::default()).is_err());
+    }
+}
