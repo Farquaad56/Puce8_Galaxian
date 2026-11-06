@@ -185,6 +185,10 @@ pub struct Settings {
     pub keys: Bindings,
     pub dip: Dip,
     pub rotation: Rotation,
+    /// Volume sonore 0..=100.
+    pub volume: u8,
+    /// Intensité des scanlines 0..=100 (0 = désactivées).
+    pub scanlines: u8,
 }
 
 impl Default for Settings {
@@ -193,6 +197,8 @@ impl Default for Settings {
             keys: Bindings::default(),
             dip: Dip::default(),
             rotation: Rotation::Cw90,
+            volume: 70,
+            scanlines: 35,
         }
     }
 }
@@ -239,6 +245,8 @@ impl Settings {
             u8::from(self.dip.service_mode)
         ));
         t.push_str(&format!("rotation={}\n", self.rotation.id()));
+        t.push_str(&format!("volume={}\n", self.volume));
+        t.push_str(&format!("scanlines={}\n", self.scanlines));
         t
     }
 
@@ -276,6 +284,16 @@ impl Settings {
                 "rotation" => {
                     if let Some(r) = Rotation::ALL.iter().copied().find(|r| r.id() == v) {
                         s.rotation = r;
+                    }
+                }
+                "volume" => {
+                    if let Ok(n) = v.parse::<u32>() {
+                        s.volume = n.min(100) as u8;
+                    }
+                }
+                "scanlines" => {
+                    if let Ok(n) = v.parse::<u32>() {
+                        s.scanlines = n.min(100) as u8;
                     }
                 }
                 _ => {}
@@ -337,5 +355,18 @@ mod tests {
             v.sort_by(|a, b| a.partial_cmp(b).unwrap());
             assert_eq!(v, vec![(0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0)]);
         }
+    }
+
+    #[test]
+    fn volume_and_scanlines_roundtrip_and_are_clamped() {
+        let s = Settings {
+            volume: 25,
+            scanlines: 80,
+            ..Settings::default()
+        };
+        let back = Settings::parse(&s.to_text());
+        assert_eq!((back.volume, back.scanlines), (25, 80));
+        let c = Settings::parse("volume=250\nscanlines=300\n");
+        assert_eq!((c.volume, c.scanlines), (100, 100));
     }
 }

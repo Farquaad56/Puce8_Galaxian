@@ -124,6 +124,43 @@ impl GalaxianApp {
         mesh.add_triangle(0, 1, 2);
         mesh.add_triangle(0, 2, 3);
         ui.painter().add(egui::Shape::mesh(mesh));
+        self.draw_scanlines(ui, dest, rot.swaps_axes());
+    }
+
+    /// Scanlines : bande sombre sur le bas de chaque ligne de balayage (les lignes brutes deviennent
+    /// des colonnes quand l'écran est tourné de 90°). Ignorées si les lignes sont trop serrées.
+    fn draw_scanlines(&self, ui: &egui::Ui, dest: egui::Rect, vertical: bool) {
+        if self.settings.scanlines == 0 {
+            return;
+        }
+        let extent = if vertical {
+            dest.width()
+        } else {
+            dest.height()
+        };
+        let step = extent / H as f32;
+        if step < 2.0 {
+            return;
+        }
+        let alpha = (f32::from(self.settings.scanlines) / 100.0 * 200.0) as u8;
+        let color = egui::Color32::from_black_alpha(alpha);
+        let painter = ui.painter();
+        for k in 0..H {
+            let a = (k as f32 + 0.6) * step;
+            let b = (k as f32 + 1.0) * step;
+            let r = if vertical {
+                egui::Rect::from_min_max(
+                    egui::pos2(dest.left() + a, dest.top()),
+                    egui::pos2(dest.left() + b, dest.bottom()),
+                )
+            } else {
+                egui::Rect::from_min_max(
+                    egui::pos2(dest.left(), dest.top() + a),
+                    egui::pos2(dest.right(), dest.top() + b),
+                )
+            };
+            painter.rect_filled(r, 0.0, color);
+        }
     }
 
     fn settings_window(&mut self, ctx: &egui::Context) {
@@ -143,6 +180,18 @@ impl GalaxianApp {
                             ui.selectable_value(&mut settings.rotation, r, r.label());
                         }
                     });
+                ui.add(
+                    egui::Slider::new(&mut settings.scanlines, 0..=100)
+                        .text("Scanlines (effet cathodique)")
+                        .suffix(" %"),
+                );
+                ui.separator();
+                ui.heading("Son");
+                ui.add(
+                    egui::Slider::new(&mut settings.volume, 0..=100)
+                        .text("Volume")
+                        .suffix(" %"),
+                );
                 ui.separator();
                 ui.heading("Touches");
                 egui::Grid::new("keys").show(ui, |ui| {
@@ -256,7 +305,11 @@ impl eframe::App for GalaxianApp {
             for _ in 0..due {
                 let hit = run_frame_until_break(&mut self.machine, self.dbg.breakpoints());
                 if let Some(a) = &self.audio {
-                    a.push(&self.machine.board.samples);
+                    let g = f32::from(self.settings.volume) / 100.0;
+                    let g = g * g;
+                    let scaled: Vec<f32> =
+                        self.machine.board.samples.iter().map(|s| s * g).collect();
+                    a.push(&scaled);
                 }
                 self.machine.board.samples.clear();
                 self.frames += 1;
