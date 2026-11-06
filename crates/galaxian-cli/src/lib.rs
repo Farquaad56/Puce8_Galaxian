@@ -5,3 +5,5 @@ pub mod args;
 pub mod wav;
 
 pub mod diff;
+
+pub mod rawcrc;
