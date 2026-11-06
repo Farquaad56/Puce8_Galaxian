@@ -1,6 +1,7 @@
 //! Application egui : affiche le framebuffer 768x224 (avec rotation) et fait tourner la machine en temps réel.
 
 use crate::audio::AudioOut;
+use crate::debugger::{Cmd, Debugger};
 use crate::keys::{to_inputs, Pressed};
 use crate::pacing::Pacer;
 use crate::settings::{Action, Dip, Rotation, Settings};
@@ -25,6 +26,7 @@ pub struct GalaxianApp {
     saved: Settings,
     show_settings: bool,
     capturing: Option<Action>,
+    dbg: Debugger,
 }
 
 impl GalaxianApp {
@@ -42,6 +44,7 @@ impl GalaxianApp {
             settings,
             show_settings: false,
             capturing: None,
+            dbg: Debugger::new(),
         }
     }
 
@@ -211,6 +214,18 @@ impl eframe::App for GalaxianApp {
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.show_settings = !self.show_settings;
         }
+        if ctx.input(|i| i.key_pressed(egui::Key::F2)) {
+            self.dbg.show_cpu = !self.dbg.show_cpu;
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F3)) {
+            self.dbg.show_mem = !self.dbg.show_mem;
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F10)) {
+            self.dbg.request(Cmd::StepInsn);
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F11)) {
+            self.dbg.request(Cmd::StepFrame);
+        }
 
         let now = Instant::now();
         let dt = now.duration_since(self.last).as_nanos() as u64;
@@ -224,13 +239,32 @@ impl eframe::App for GalaxianApp {
         self.settings.dip.apply(&mut inputs);
         self.machine.board.inputs = inputs;
         let due = self.pacer.frames_due(dt);
-        for _ in 0..due {
-            self.machine.run_frame();
-            if let Some(a) = &self.audio {
-                a.push(&self.machine.board.samples);
+        let cmd = self.dbg.take_cmd();
+        if self.dbg.paused {
+            match cmd {
+                Cmd::StepInsn => {
+                    self.machine.step();
+                }
+                Cmd::StepFrame => {
+                    self.machine.run_frame();
+                    self.frames += 1;
+                }
+                Cmd::None => {}
             }
             self.machine.board.samples.clear();
-            self.frames += 1;
+        } else {
+            for _ in 0..due {
+                let hit = run_frame_until_break(&mut self.machine, self.dbg.breakpoints());
+                if let Some(a) = &self.audio {
+                    a.push(&self.machine.board.samples);
+                }
+                self.machine.board.samples.clear();
+                self.frames += 1;
+                if let Some(pc) = hit {
+                    self.dbg.hit_breakpoint(pc);
+                    break;
+                }
+            }
         }
 
         let image = self.framebuffer_image();
@@ -250,6 +284,15 @@ impl eframe::App for GalaxianApp {
                 if ui.button("Redémarrer").clicked() {
                     self.restart();
                 }
+                if ui.button("CPU (F2)").clicked() {
+                    self.dbg.show_cpu = !self.dbg.show_cpu;
+                }
+                if ui.button("Mémoire (F3)").clicked() {
+                    self.dbg.show_mem = !self.dbg.show_mem;
+                }
+                if self.dbg.paused {
+                    ui.colored_label(egui::Color32::YELLOW, "PAUSE");
+                }
                 ui.label("Échap : quitter");
             });
         });
@@ -257,6 +300,7 @@ impl eframe::App for GalaxianApp {
             .frame(egui::Frame::NONE.fill(egui::Color32::BLACK))
             .show(ctx, |ui| self.draw_screen(ui));
         self.settings_window(ctx);
+        self.dbg.ui(ctx, &self.machine, &self.rom, self.frames);
 
         if self.settings != self.saved {
             self.settings.save();
@@ -264,4 +308,21 @@ impl eframe::App for GalaxianApp {
         }
         ctx.request_repaint();
     }
+}
+
+/// Exécute une image ; avec des points d'arrêt, s'arrête dès que PC en atteint un (retourne son adresse).
+fn run_frame_until_break(machine: &mut Machine, breakpoints: &[u16]) -> Option<u16> {
+    if breakpoints.is_empty() {
+        machine.run_frame();
+        return None;
+    }
+    machine.board.vblank_flag = false;
+    while !machine.board.vblank_flag {
+        machine.step();
+        let pc = machine.cpu.regs.pc;
+        if breakpoints.contains(&pc) {
+            return Some(pc);
+        }
+    }
+    None
 }

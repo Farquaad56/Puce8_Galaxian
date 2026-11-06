@@ -2,9 +2,11 @@
 //! Usage : puce8-galaxian-gui <galaxian.zip>
 //! Touches par défaut : 5 = pièce, 1 / 2 = start, flèches = déplacement, espace = tir, échap = quitter.
 //! F1 : réglages (touches, interrupteurs DIP, rotation de l'écran).
+//! F2 / F3 : débogueur CPU / mémoire ; en pause, F10 = une instruction, F11 = une image.
 
 mod app;
 mod audio;
+mod debugger;
 mod keys;
 mod pacing;
 mod settings;

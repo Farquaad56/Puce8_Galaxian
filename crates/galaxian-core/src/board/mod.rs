@@ -76,6 +76,35 @@ impl Board {
         }
     }
 
+    /// Lecture SANS effet de bord (débogueur) : ne journalise pas, ne remet pas le watchdog à zéro.
+    pub fn peek(&self, addr: u16) -> u8 {
+        match addr {
+            0x0000..=0x3fff => self.program[addr as usize],
+            0x4000..=0x47ff => self.ram[(addr & 0x3ff) as usize],
+            0x5000..=0x57ff => self.video.vram[(addr & 0x3ff) as usize],
+            0x5800..=0x5fff => self.video.objram[(addr & 0xff) as usize],
+            0x6000..=0x67ff => self.inputs.in0,
+            0x6800..=0x6fff => self.inputs.in1,
+            0x7000..=0x77ff => self.inputs.in2,
+            _ => 0xff,
+        }
+    }
+
+    /// NMI autorisée (latch 7001).
+    pub fn nmi_enabled(&self) -> bool {
+        self.irq_enabled
+    }
+
+    /// Ligne NMI actuellement levée.
+    pub fn nmi_pending(&self) -> bool {
+        self.nmi_line
+    }
+
+    /// Compteur du watchdog (en VBLANK depuis la dernière lecture de 7800).
+    pub fn watchdog_count(&self) -> u32 {
+        self.watchdog_count
+    }
+
     /// T-state dans l'image courante (0..50688).
     pub fn frame_t(&self) -> u32 {
         ((self.tstate + u64::from(SCREEN_PHASE_T)) % u64::from(T_PER_FRAME)) as u32

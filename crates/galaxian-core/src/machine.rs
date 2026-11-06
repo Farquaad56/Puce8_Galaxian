@@ -33,6 +33,13 @@ impl Machine {
         self.cpu.step(&mut self.board)
     }
 
+    /// Désassemble l'instruction à `addr` (lecture sans effet de bord) : texte et longueur en octets.
+    pub fn disassemble_at(&self, addr: u16) -> (String, u8) {
+        let board = &self.board;
+        let insn = puce_z80::disasm::disassemble(addr, &mut |a| board.peek(a));
+        (insn.text.as_str().to_owned(), insn.len)
+    }
+
     /// Comme `run_frame`, mais appelle `hook` AVANT chaque instruction (traces).
     pub fn run_frame_hook(&mut self, hook: &mut dyn FnMut(&Machine)) {
         self.board.vblank_flag = false;
