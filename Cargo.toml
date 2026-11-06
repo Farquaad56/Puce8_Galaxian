@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/galaxian-core", "crates/galaxian-cli"]
+members = ["crates/galaxian-core", "crates/galaxian-cli", "crates/galaxian-gui"]
 
 [workspace.package]
 version = "0.1.0"
