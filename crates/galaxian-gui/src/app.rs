@@ -1,44 +1,59 @@
-//! Application egui : affiche le framebuffer 768x224 et fait tourner la machine en temps réel.
+//! Application egui : affiche le framebuffer 768x224 (avec rotation) et fait tourner la machine en temps réel.
 
 use crate::audio::AudioOut;
 use crate::keys::{to_inputs, Pressed};
 use crate::pacing::Pacer;
+use crate::settings::{Action, Dip, Rotation, Settings};
 use eframe::egui;
-use galaxian_core::Machine;
+use galaxian_core::{Machine, RomSet};
 use std::time::Instant;
 
 const W: usize = 768;
 const H: usize = 224;
+/// Rapport largeur/hauteur de l'image brute avec des pixels carrés : 256 x 224.
+const RAW_ASPECT: f32 = 256.0 / 224.0;
 
 pub struct GalaxianApp {
+    rom: RomSet,
     machine: Machine,
     pacer: Pacer,
     last: Instant,
     texture: Option<egui::TextureHandle>,
     frames: u64,
     audio: Option<AudioOut>,
+    settings: Settings,
+    saved: Settings,
+    show_settings: bool,
+    capturing: Option<Action>,
 }
 
 impl GalaxianApp {
-    pub fn new(machine: Machine) -> GalaxianApp {
+    pub fn new(rom: RomSet, machine: Machine) -> GalaxianApp {
+        let settings = Settings::load();
         GalaxianApp {
+            rom,
             machine,
             pacer: Pacer::new(),
             last: Instant::now(),
             texture: None,
             frames: 0,
             audio: AudioOut::new(),
+            saved: settings.clone(),
+            settings,
+            show_settings: false,
+            capturing: None,
         }
     }
 
-    fn read_keys(ctx: &egui::Context) -> Pressed {
+    fn read_keys(&self, ctx: &egui::Context) -> Pressed {
+        let k = &self.settings.keys;
         ctx.input(|i| Pressed {
-            coin: i.key_down(egui::Key::Num5),
-            start1: i.key_down(egui::Key::Num1),
-            start2: i.key_down(egui::Key::Num2),
-            left: i.key_down(egui::Key::ArrowLeft),
-            right: i.key_down(egui::Key::ArrowRight),
-            fire: i.key_down(egui::Key::Space),
+            coin: i.key_down(k.get(Action::Coin)),
+            start1: i.key_down(k.get(Action::Start1)),
+            start2: i.key_down(k.get(Action::Start2)),
+            left: i.key_down(k.get(Action::Left)),
+            right: i.key_down(k.get(Action::Right)),
+            fire: i.key_down(k.get(Action::Fire)),
         })
     }
 
@@ -51,18 +66,163 @@ impl GalaxianApp {
         }
         egui::ColorImage::from_rgb([W, H], &rgb)
     }
+
+    /// Touche pressée pendant une capture de rebinding (Échap annule).
+    fn captured_key(ctx: &egui::Context) -> Option<egui::Key> {
+        ctx.input(|i| {
+            i.events.iter().find_map(|e| match e {
+                egui::Event::Key {
+                    key,
+                    pressed: true,
+                    repeat: false,
+                    ..
+                } => Some(*key),
+                _ => None,
+            })
+        })
+    }
+
+    fn restart(&mut self) {
+        self.machine = Machine::new(&self.rom);
+        self.pacer = Pacer::new();
+        self.frames = 0;
+    }
+
+    fn draw_screen(&self, ui: &mut egui::Ui) {
+        let Some(t) = &self.texture else {
+            return;
+        };
+        let rect = ui.available_rect_before_wrap();
+        let rot = self.settings.rotation;
+        let aspect = if rot.swaps_axes() {
+            1.0 / RAW_ASPECT
+        } else {
+            RAW_ASPECT
+        };
+        let mut size = egui::vec2(rect.width(), rect.width() / aspect);
+        if size.y > rect.height() {
+            size = egui::vec2(rect.height() * aspect, rect.height());
+        }
+        let dest = egui::Rect::from_center_size(rect.center(), size);
+        let corners = [
+            dest.left_top(),
+            dest.right_top(),
+            dest.right_bottom(),
+            dest.left_bottom(),
+        ];
+        let mut mesh = egui::Mesh::with_texture(t.id());
+        for (pos, (u, v)) in corners.into_iter().zip(rot.uvs()) {
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos,
+                uv: egui::pos2(u, v),
+                color: egui::Color32::WHITE,
+            });
+        }
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
+        ui.painter().add(egui::Shape::mesh(mesh));
+    }
+
+    fn settings_window(&mut self, ctx: &egui::Context) {
+        let mut open = self.show_settings;
+        let settings = &mut self.settings;
+        let capturing = &mut self.capturing;
+        let mut restart = false;
+        egui::Window::new("Réglages")
+            .open(&mut open)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.heading("Affichage");
+                egui::ComboBox::from_label("Rotation")
+                    .selected_text(settings.rotation.label())
+                    .show_ui(ui, |ui| {
+                        for r in Rotation::ALL {
+                            ui.selectable_value(&mut settings.rotation, r, r.label());
+                        }
+                    });
+                ui.separator();
+                ui.heading("Touches");
+                egui::Grid::new("keys").show(ui, |ui| {
+                    for a in Action::ALL {
+                        ui.label(a.label());
+                        let text = if *capturing == Some(a) {
+                            "Appuyez sur une touche… (Échap : annuler)".to_owned()
+                        } else {
+                            settings.keys.get(a).name().to_owned()
+                        };
+                        if ui.button(text).clicked() {
+                            *capturing = Some(a);
+                        }
+                        ui.end_row();
+                    }
+                });
+                if ui.button("Touches par défaut").clicked() {
+                    settings.keys = Settings::default().keys;
+                    *capturing = None;
+                }
+                ui.separator();
+                ui.heading("Interrupteurs DIP");
+                egui::ComboBox::from_label("Vie bonus à")
+                    .selected_text(Dip::BONUS_LABELS[usize::from(settings.dip.bonus & 3)])
+                    .show_ui(ui, |ui| {
+                        for (i, l) in Dip::BONUS_LABELS.iter().enumerate() {
+                            ui.selectable_value(&mut settings.dip.bonus, i as u8, *l);
+                        }
+                    });
+                ui.horizontal(|ui| {
+                    ui.label("Vies");
+                    ui.radio_value(&mut settings.dip.three_lives, false, "2");
+                    ui.radio_value(&mut settings.dip.three_lives, true, "3");
+                });
+                egui::ComboBox::from_label("Pièces")
+                    .selected_text(Dip::COINAGE_LABELS[usize::from(settings.dip.coinage & 3)])
+                    .show_ui(ui, |ui| {
+                        for (i, l) in Dip::COINAGE_LABELS.iter().enumerate() {
+                            ui.selectable_value(&mut settings.dip.coinage, i as u8, *l);
+                        }
+                    });
+                ui.checkbox(&mut settings.dip.cocktail, "Cabinet cocktail");
+                ui.checkbox(&mut settings.dip.service_mode, "Mode service");
+                ui.label("Les DIP sont lus en direct ; redémarrez pour un effet complet.");
+                if ui.button("Redémarrer la machine").clicked() {
+                    restart = true;
+                }
+            });
+        self.show_settings = open;
+        if restart {
+            self.restart();
+        }
+    }
 }
 
 impl eframe::App for GalaxianApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        // Capture d'une touche pour le rebinding : elle ne doit pas être vue par le jeu.
+        if let Some(action) = self.capturing {
+            if let Some(key) = Self::captured_key(ctx) {
+                if key != egui::Key::Escape {
+                    self.settings.keys.set(action, key);
+                }
+                self.capturing = None;
+            }
+        } else if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
+        if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
+            self.show_settings = !self.show_settings;
+        }
+
         let now = Instant::now();
         let dt = now.duration_since(self.last).as_nanos() as u64;
         self.last = now;
 
-        self.machine.board.inputs = to_inputs(&Self::read_keys(ctx));
+        let mut inputs = if self.capturing.is_some() {
+            to_inputs(&Pressed::default())
+        } else {
+            to_inputs(&self.read_keys(ctx))
+        };
+        self.settings.dip.apply(&mut inputs);
+        self.machine.board.inputs = inputs;
         let due = self.pacer.frames_due(dt);
         for _ in 0..due {
             self.machine.run_frame();
@@ -82,22 +242,26 @@ impl eframe::App for GalaxianApp {
             }
         }
 
+        egui::TopBottomPanel::top("barre").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if ui.button("Réglages (F1)").clicked() {
+                    self.show_settings = !self.show_settings;
+                }
+                if ui.button("Redémarrer").clicked() {
+                    self.restart();
+                }
+                ui.label("Échap : quitter");
+            });
+        });
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(egui::Color32::BLACK))
-            .show(ctx, |ui| {
-                if let Some(t) = &self.texture {
-                    let avail = ui.available_size();
-                    // Pixels matériels 4:3 : l'image 768x224 est affichée avec un rapport 768:672 (hauteur x3).
-                    let aspect = W as f32 / (H as f32 * 3.0);
-                    let mut size = egui::vec2(avail.x, avail.x / aspect);
-                    if size.y > avail.y {
-                        size = egui::vec2(avail.y * aspect, avail.y);
-                    }
-                    ui.centered_and_justified(|ui| {
-                        ui.add(egui::Image::new((t.id(), size)));
-                    });
-                }
-            });
+            .show(ctx, |ui| self.draw_screen(ui));
+        self.settings_window(ctx);
+
+        if self.settings != self.saved {
+            self.settings.save();
+            self.saved = self.settings.clone();
+        }
         ctx.request_repaint();
     }
 }

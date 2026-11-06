@@ -1,11 +1,13 @@
 //! Puce8 Galaxian : frontend egui/eframe (wgpu).
 //! Usage : puce8-galaxian-gui <galaxian.zip>
-//! Touches : 5 = pièce, 1 / 2 = start, flèches = déplacement, espace = tir, échap = quitter.
+//! Touches par défaut : 5 = pièce, 1 / 2 = start, flèches = déplacement, espace = tir, échap = quitter.
+//! F1 : réglages (touches, interrupteurs DIP, rotation de l'écran).
 
 mod app;
 mod audio;
 mod keys;
 mod pacing;
+mod settings;
 
 use galaxian_core::{Machine, RomSet};
 use std::path::Path;
@@ -35,6 +37,6 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "Puce8 Galaxian",
         options,
-        Box::new(|_cc| Ok(Box::new(app::GalaxianApp::new(machine)))),
+        Box::new(|_cc| Ok(Box::new(app::GalaxianApp::new(rom, machine)))),
     )
 }
