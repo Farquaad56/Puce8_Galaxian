@@ -1,5 +1,6 @@
 //! Application egui : affiche le framebuffer 768x224 et fait tourner la machine en temps réel.
 
+use crate::audio::AudioOut;
 use crate::keys::{to_inputs, Pressed};
 use crate::pacing::Pacer;
 use eframe::egui;
@@ -15,6 +16,7 @@ pub struct GalaxianApp {
     last: Instant,
     texture: Option<egui::TextureHandle>,
     frames: u64,
+    audio: Option<AudioOut>,
 }
 
 impl GalaxianApp {
@@ -25,6 +27,7 @@ impl GalaxianApp {
             last: Instant::now(),
             texture: None,
             frames: 0,
+            audio: AudioOut::new(),
         }
     }
 
@@ -63,7 +66,10 @@ impl eframe::App for GalaxianApp {
         let due = self.pacer.frames_due(dt);
         for _ in 0..due {
             self.machine.run_frame();
-            self.machine.board.samples.clear(); // pas de sortie audio dans cette version
+            if let Some(a) = &self.audio {
+                a.push(&self.machine.board.samples);
+            }
+            self.machine.board.samples.clear();
             self.frames += 1;
         }
 

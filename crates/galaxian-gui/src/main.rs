@@ -3,6 +3,7 @@
 //! Touches : 5 = pièce, 1 / 2 = start, flèches = déplacement, espace = tir, échap = quitter.
 
 mod app;
+mod audio;
 mod keys;
 mod pacing;
 
