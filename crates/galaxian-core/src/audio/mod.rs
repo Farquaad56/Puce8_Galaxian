@@ -1,13 +1,18 @@
 //! Son Galaxian. Un échantillon (48 kHz) est produit tous les 64 T-states (3 072 000 / 48 000).
 //!
-//! Partie NUMÉRIQUE exacte (portée de MAME discrete) : `noise`, `pitch`.
-//! Partie ANALOGIQUE (555, filtres, mixage) : modèle APPROCHÉ v0, à calibrer sur les golden WAV.
+//! Partie NUMÉRIQUE exacte (port de MAME discrete) : `noise`, `pitch`.
+//! Partie ANALOGIQUE : port des modules discrets de MAME 0.287 (voir `analog`) :
+//! DAC LFO -> 555 CC -> tension de commande des 3 oscillateurs 555 de fond, mixeurs Millman,
+//! HIT (RCDISC5 + passe-bande), FIRE (RC + 555 + RCDISC5), mixeur final avec passe-haut.
 
+mod analog;
 mod noise;
 mod pitch;
 
 pub use noise::Noise;
 pub use pitch::Pitch;
+
+use analog::{Astable, AstableParams, BandPass, Cc, FinalMix, Out555, RcDisc5, RcFilter};
 
 pub const SAMPLE_RATE: u32 = 48_000;
 pub(crate) const SAMPLE_TIME: f64 = 1.0 / SAMPLE_RATE as f64;
@@ -39,18 +44,34 @@ pub struct Audio {
     sq_phase: f64,
     sq_last: bool,
     noise_sampled: bool,
-    osc_phase: [f64; 3],
-    hit_env: f64,
-    fire_env: f64,
-    lp: f64,
+    // fond
+    lfo_cc: Cc,
+    bg_osc: [Astable; 3],
+    bg_lp: f64,
+    // HIT
+    hit_rc: RcDisc5,
+    hit_bp: BandPass,
+    // FIRE
+    fire_rc: RcFilter,
+    fire_osc: Astable,
+    fire_out: RcDisc5,
+    // mixeur final
+    mix: FinalMix,
 }
 
-/// Fréquences nominales des 3 oscillateurs 555 : 1.44 / ((R1 + 2 R2) C).
-const BG_FREQ_HZ: [f64; 3] = [
-    1.44 / ((100e3 + 2.0 * 470e3) * 0.01e-6),
-    1.44 / ((100e3 + 2.0 * 330e3) * 0.01e-6),
-    1.44 / ((100e3 + 2.0 * 220e3) * 0.01e-6),
+const R21: f64 = 100e3;
+const C15: f64 = 1e-6;
+/// R1, R2, C des trois 555 de fond.
+const BG_RC: [(f64, f64, f64); 3] = [
+    (100e3, 470e3, 0.01e-6),
+    (100e3, 330e3, 0.01e-6),
+    (100e3, 220e3, 0.01e-6),
 ];
+/// MULTADD du nœud 110 : R33 / (R31 || R32 || R33), puis -5 * R33 / R31.
+const MULT: f64 = 10e3 * (1.0 / 47e3 + 1.0 / 47e3 + 1.0 / 10e3);
+const ADD: f64 = -5.0 * 10e3 / 47e3;
+/// Mélange des trois sorties 555 : 3 x 10 k, puis passe-bas C20 = 0,1 µF sur 10k/3.
+const BG_MIX_TAU: f64 = (10e3 / 3.0) * 0.1e-6;
 
 impl Audio {
     pub fn new() -> Audio {
@@ -61,33 +82,28 @@ impl Audio {
             sq_phase: 0.0,
             sq_last: false,
             noise_sampled: false,
-            osc_phase: [0.0; 3],
-            hit_env: 0.0,
-            fire_env: 0.0,
-            lp: 0.0,
-        }
-    }
-
-    /// Mélange résistif : somme(V/R) / somme(1/R) sur les entrées connectées (R > 0).
-    fn resistor_mix(inputs: &[(f64, f64)]) -> f64 {
-        let mut num = 0.0;
-        let mut den = 0.0;
-        for &(v, r) in inputs {
-            if r > 0.0 {
-                num += v / r;
-                den += 1.0 / r;
-            }
-        }
-        if den == 0.0 {
-            0.0
-        } else {
-            num / den
+            lfo_cc: Cc::new(),
+            bg_osc: [Astable::new(), Astable::new(), Astable::new()],
+            bg_lp: 0.0,
+            hit_rc: RcDisc5::new(150e3 + 22e3, 2.2e-6),
+            hit_bp: BandPass::new(
+                150e3,
+                22e3,
+                470e3,
+                0.01e-6,
+                0.01e-6,
+                5.0 * 22e3 / (33e3 + 22e3),
+            ),
+            fire_rc: RcFilter::new(2.2e3, 47e-6),
+            fire_osc: Astable::new(),
+            fire_out: RcDisc5::new(100e3, 1e-6),
+            mix: FinalMix::new(),
         }
     }
 
     /// Produit UN échantillon (à appeler tous les 64 T-states). Sortie dans -1.0..=1.0.
     pub fn step_sample(&mut self) -> f32 {
-        // --- partie exacte
+        // --- partie numérique exacte
         let noise = self.noise.step_sample();
         self.sq_phase = (self.sq_phase + SQUARE_2V_HZ * SAMPLE_TIME).fract();
         let sq = self.sq_phase < 0.5;
@@ -97,38 +113,72 @@ impl Audio {
         self.sq_last = sq;
         let count2 = self.pitch.step_sample(self.regs.pitch);
         let bit = |n: u8| f64::from((count2 >> n) & 1) * TTL_OUT;
+        let n152 = if self.noise_sampled { 1.0 } else { 0.0 };
 
-        // --- partie approchée (v0)
-        let mut bg = 0.0;
-        for (i, freq) in BG_FREQ_HZ.iter().enumerate() {
-            self.osc_phase[i] = (self.osc_phase[i] + freq * SAMPLE_TIME).fract();
-            if self.regs.fs[i] && self.osc_phase[i] < 0.5 {
-                bg += TTL_OUT / 3.0;
-            }
+        // --- fond : DAC -> 555 CC -> MULTADD/CLAMP -> 3 x 555 astable -> mixeur + passe-bas
+        let v_dac = analog::dac_r1(self.regs.lfo, TTL_OUT);
+        let v_cap = self.lfo_cc.step(v_dac, R21, C15);
+        let cv = (v_cap * MULT + ADD).clamp(0.0, 5.0);
+        let mut outs = [0.0; 3];
+        for (i, osc) in self.bg_osc.iter_mut().enumerate() {
+            let (r1, r2, c) = BG_RC[i];
+            let p = AstableParams {
+                r1,
+                r2,
+                c,
+                v_high: 5.0 - 0.5,
+                mode: Out555::Energy,
+            };
+            outs[i] = osc.step(!self.regs.fs[i], p, cv);
         }
+        let bg_raw = (outs[0] + outs[1] + outs[2]) / 3.0;
+        self.bg_lp += (bg_raw - self.bg_lp) * (1.0 - (-SAMPLE_TIME / BG_MIX_TAU).exp());
+
+        // --- pré-mixeur (nœud 279)
         let vol1_r = if self.regs.vol[0] { 10e3 } else { 0.0 };
         let vol2_r = if self.regs.vol[1] { 15e3 } else { 0.0 };
-        let pre = Audio::resistor_mix(&[
-            (bit(0), 33e3),
-            (bit(2), vol1_r),
-            (bit(2), 22e3),
-            (bit(3), vol2_r),
-            (bg, 5.1e3),
-        ]);
-        // HIT : bruit échantillonné avec enveloppe (monte vite, retombe en ~0.38 s)
-        let target = if self.regs.hit { 1.0 } else { 0.0 };
-        let tau = if self.regs.hit { 0.01 } else { 0.38 };
-        self.hit_env += (target - self.hit_env) * (SAMPLE_TIME / tau);
-        let hit = if self.noise_sampled { TTL_OUT } else { 0.0 } * self.hit_env;
-        // FIRE : bruit + enveloppe courte
-        let target = if self.regs.fire { 1.0 } else { 0.0 };
-        let tau = if self.regs.fire { 0.005 } else { 0.1 };
-        self.fire_env += (target - self.fire_env) * (SAMPLE_TIME / tau);
-        let fire = if self.noise_sampled { TTL_OUT } else { 0.0 } * self.fire_env;
-        let mixed = Audio::resistor_mix(&[(pre, 5.1e3), (hit, 1.32e3), (fire, 2.2e3)]);
-        // filtre passe-bas simple puis normalisation
-        self.lp += (mixed - self.lp) * 0.3;
-        ((self.lp - 1.0) / 4.0) as f32
+        let pre = analog::millman(
+            &[
+                (bit(0), 33e3),
+                (bit(2), vol1_r),
+                (bit(2), 22e3),
+                (bit(3), vol2_r),
+                (self.bg_lp, 5.1e3),
+            ],
+            0.0,
+        );
+
+        // --- HIT
+        // DISCRETE_RCDISC5(node, ENAB = bruit 152, INP = HIT * 4 V)
+        let hit_in = if self.regs.hit { TTL_OUT } else { 0.0 };
+        let n155 = self.hit_rc.step(n152 != 0.0, hit_in);
+        let n157 = self.hit_bp.step(n155);
+
+        // --- FIRE
+        let fire = self.regs.fire;
+        let n171 = if fire { TTL_OUT } else { 0.0 };
+        let n172 = if fire { 0.0 } else { TTL_OUT };
+        let n173 = self.fire_rc.step(n172);
+        let r46 = 10e3;
+        let r48 = 2.2e3;
+        let n177 = n152 * TTL_OUT / r46 + n173 / r48;
+        let n178 = n177 * (r46 * r48 / (r46 + r48));
+        let n181 = self.fire_osc.step(
+            false,
+            AstableParams {
+                r1: 10e3,
+                r2: 22e3,
+                c: 0.01e-6,
+                v_high: 1.0,
+                mode: Out555::Square,
+            },
+            n178,
+        );
+        let n182 = self.fire_out.step(n181 != 0.0, n171);
+
+        // --- mixeur final + passe-haut
+        let out = self.mix.step(pre, n157, n182);
+        out.clamp(-1.0, 1.0) as f32
     }
 }
 
@@ -143,13 +193,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn silence_when_everything_is_off_is_constant() {
+    fn silence_when_everything_is_off_settles() {
         let mut a = Audio::new();
-        let first = a.step_sample();
-        let mut max_dev = 0.0f32;
-        for _ in 0..2000 {
-            max_dev = max_dev.max((a.step_sample() - first).abs());
+        for _ in 0..48_000 {
+            a.step_sample();
         }
-        assert!(max_dev < 0.5, "sortie instable : {max_dev}");
+        let mut max_dev = 0.0f32;
+        for _ in 0..4_000 {
+            max_dev = max_dev.max(a.step_sample().abs());
+        }
+        assert!(max_dev < 0.2, "sortie instable : {max_dev}");
+    }
+
+    #[test]
+    fn output_is_always_finite_and_bounded() {
+        let mut a = Audio::new();
+        a.regs.fs = [true; 3];
+        a.regs.hit = true;
+        a.regs.fire = true;
+        a.regs.vol = [true; 2];
+        a.regs.pitch = 0x40;
+        a.regs.lfo = 5;
+        for _ in 0..100_000 {
+            let s = a.step_sample();
+            assert!(s.is_finite() && s.abs() <= 1.0);
+        }
     }
 }
