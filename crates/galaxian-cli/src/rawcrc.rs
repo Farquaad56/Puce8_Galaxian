@@ -9,7 +9,8 @@ use std::io::Write;
 /// CRC32 des octets R,G,B d'une image `pixels` (4 octets par pixel).
 pub fn frame_crc(pixels: &[u8], bgra: bool) -> u32 {
     let mut rgb = Vec::with_capacity(pixels.len() / 4 * 3);
-    for px in pixels.chunks_exact(4) {
+    let (chunks, _) = pixels.as_chunks::<4>();
+    for px in chunks {
         if bgra {
             rgb.extend_from_slice(&[px[2], px[1], px[0]]);
         } else {
