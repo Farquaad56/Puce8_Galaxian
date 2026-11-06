@@ -58,7 +58,7 @@ mod tests {
         let m = Machine::new(&RomSet::blank());
         let l = cpu_line(&m);
         assert_eq!(l.split_whitespace().count(), 13);
-        assert!(l.starts_with("C 0 0 0 0 0000"));
+        assert!(l.starts_with("C 0 240 0 0 0000"));
     }
 
     #[test]

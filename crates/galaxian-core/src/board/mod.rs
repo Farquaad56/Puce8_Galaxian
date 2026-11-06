@@ -78,7 +78,7 @@ impl Board {
 
     /// T-state dans l'image courante (0..50688).
     pub fn frame_t(&self) -> u32 {
-        (self.tstate % u64::from(T_PER_FRAME)) as u32
+        ((self.tstate + u64::from(SCREEN_PHASE_T)) % u64::from(T_PER_FRAME)) as u32
     }
     /// Ligne courante (0..264), équivalent de `screen->vpos()`.
     pub fn vpos(&self) -> u32 {
@@ -90,7 +90,7 @@ impl Board {
     }
     /// Numéro d'image au sens de `screen->frame_number()` : incrémenté à la fin du VBLANK (ligne 16).
     pub fn mame_frame(&self) -> u32 {
-        ((self.tstate + u64::from(248 * T_PER_LINE)) / u64::from(T_PER_FRAME)) as u32
+        ((self.tstate + u64::from(224 * T_PER_LINE)) / u64::from(T_PER_FRAME)) as u32
     }
 
     fn record(&mut self, addr: u16, data: u8, write: bool) {

@@ -74,10 +74,10 @@ mod tests {
     }
 
     #[test]
-    fn first_vblank_is_at_line_240() {
+    fn first_vblank_after_one_full_frame() {
         let mut m = Machine::new(&rom_with_program(&[0x18, 0xFE]));
         m.run_frame();
-        assert_eq!(m.board.tstate / 192, 240); // 46080 T-states
+        assert_eq!(m.board.tstate / 192, 264); // le faisceau démarre à la ligne 240 : premier VBLANK après 264 lignes
     }
 
     #[test]

@@ -52,7 +52,7 @@ impl Video {
             star_origin_frame: 0,
             fb: vec![0; FB_WIDTH * FB_HEIGHT],
             next_row: 0,
-            frame_finished: false,
+            frame_finished: true,
             gfx: gfx::decode(&rom.gfx),
             palette: palette::build_palette(&prom),
             star_colors: palette::build_star_colors(),

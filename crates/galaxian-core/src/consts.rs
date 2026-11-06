@@ -31,6 +31,10 @@ pub const FB_HEIGHT: usize = 224;
 /// Période du LFSR des étoiles : 2^17 - 1.
 pub const STAR_RNG_PERIOD: u32 = (1 << 17) - 1;
 
+/// Phase de l'écran à t = 0 : MAME démarre avec le faisceau au début du VBLANK (ligne 240),
+/// soit 240 lignes de 192 T-states. Vérifié contre MAME 0.287 (vpos/hpos du débogueur et CRC vidéo).
+pub const SCREEN_PHASE_T: u32 = 240 * T_PER_LINE;
+
 #[cfg(test)]
 mod tests {
     use super::*;

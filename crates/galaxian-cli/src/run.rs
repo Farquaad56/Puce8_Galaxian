@@ -61,11 +61,17 @@ pub fn crc_frames(args: &Args) -> Result<(), String> {
     let frames: u64 = args.num("frames", 60);
     let out = args.get("out").ok_or("--out requis")?;
     let mut w = BufWriter::new(std::fs::File::create(out).map_err(|e| e.to_string())?);
-    for f in 0..frames {
+    // MAME appelle son rappel « image terminée » une première fois à t = 0 (image noire initiale) :
+    // l'index 0 est cette image, l'index n est l'image n-ème fin de VBLANK.
+    if frames > 0 {
+        writeln!(w, "{}", trace::video_line(0, m.board.video.frame_crc32()))
+            .map_err(|e| e.to_string())?;
+    }
+    for f in 1..frames {
         m.run_frame();
         writeln!(w, "{}", trace::video_line(f, m.board.video.frame_crc32()))
             .map_err(|e| e.to_string())?;
-        m.board.inputs = script.at(f + 1);
+        m.board.inputs = script.at(f);
     }
     Ok(())
 }
