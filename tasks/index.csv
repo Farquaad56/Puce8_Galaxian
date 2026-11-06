@@ -28,23 +28,23 @@ T026,CLI : diff.rs (comparateur de traces C/B/V avec tolérances),75,T025,docs/t
 T027,CLI : rawcrc.rs (CRC32 des dumps vidéo bruts de MAME),74,T026,docs/tasks/T027.md
 T028,"CLI : run.rs (run, crc-frames, trace-cpu, trace-bus)",73,T027,docs/tasks/T028.md
 T029,CLI : main.rs final + build release + tests de tout le workspace,72,T028,docs/tasks/T029.md
-T030,Ancre 1 : 3 images de la ROM réelle (CRC vidéo et watchdog),71,T029,docs/tasks/T030.md
-T031,"Ancre 2 : trace CPU d'une image (6563 lignes, 24 premières exactes)",70,T030,docs/tasks/T031.md
-T032,"Ancre 3 : trace du bus d'une image (1310 lignes, 14 premières exactes)",69,T031,docs/tasks/T032.md
-T033,Ancre 4 : scénario d'entrées et 700 CRC vidéo (9 points de contrôle),68,T032,docs/tasks/T033.md
-T034,Golden : vérifier la présence des documents de format et de matériel,67,T033,docs/tasks/T034.md
-T035,Golden : scripts MAME (débogueur + Lua) et runner PowerShell,66,T034,docs/tasks/T035.md
-T036,"Golden : valider MAME 0.287, le romset et l'API Lua des ports",65,T035,docs/tasks/T036.md
-T037,Golden : valider la trace CPU MAME contre l'émulateur sur 3 images,64,T036,docs/tasks/T037.md
-T038,Golden : valider le dump vidéo MAME (taille brute et 60 CRC),63,T037,docs/tasks/T038.md
-T039,Golden : premier WAV MAME et comparaison de format avec l'émulateur,62,T038,docs/tasks/T039.md
-T040,"Campagne 1 : trace CPU 700 images, MAME contre émulateur (registres puis tstate)",61,T039,docs/tasks/T040.md
-T041,Campagne 2 : accès bus 700 images (contenu puis timing),60,T040,docs/tasks/T041.md
-T042,"Campagne 3 : CRC vidéo 700 images, MAME contre émulateur",59,T041,docs/tasks/T042.md
-T050,Mesure : date exacte des écritures 7004 (étoiles) vue par MAME et par l'émulateur,58,T042,docs/tasks/T050.md
-T070,"GUI : crate galaxian-gui (Cargo.toml, main.rs provisoire)",57,T050,docs/tasks/T070.md
-T071,GUI : keys.rs (touches clavier vers entrées de la machine),56,T070,docs/tasks/T071.md
-T072,"GUI : pacing.rs (cadencement 60,606 Hz)",55,T071,docs/tasks/T072.md
-T073,"GUI : app.rs (fenêtre egui, texture 768x224, boucle d'émulation)",54,T072,docs/tasks/T073.md
-T074,"GUI : main.rs final, build, tests et clippy",53,T073,docs/tasks/T074.md
-T075,"GUI : recette manuelle (affichage, pièce, partie, clavier)",52,T074,docs/tasks/T075.md
+T070,"GUI : crate galaxian-gui (Cargo.toml, main.rs provisoire)",71,T029,docs/tasks/T070.md
+T071,GUI : keys.rs (touches clavier vers entrées de la machine),70,T070,docs/tasks/T071.md
+T072,"GUI : pacing.rs (cadencement 60,606 Hz)",69,T071,docs/tasks/T072.md
+T073,"GUI : app.rs (fenêtre egui, texture 768x224, boucle d'émulation)",68,T072,docs/tasks/T073.md
+T074,"GUI : main.rs final, build, tests et clippy",67,T073,docs/tasks/T074.md
+T075,"GUI : recette manuelle (affichage, pièce, partie, clavier)",66,T074,docs/tasks/T075.md
+T030,Ancre 1 : 3 images de la ROM réelle (CRC vidéo et watchdog),65,T075,docs/tasks/T030.md
+T031,"Ancre 2 : trace CPU d'une image (6563 lignes, 24 premières exactes)",64,T030,docs/tasks/T031.md
+T032,"Ancre 3 : trace du bus d'une image (1310 lignes, 14 premières exactes)",63,T031,docs/tasks/T032.md
+T033,Ancre 4 : scénario d'entrées et 700 CRC vidéo (9 points de contrôle),62,T032,docs/tasks/T033.md
+T034,Golden : vérifier la présence des documents de format et de matériel,61,T033,docs/tasks/T034.md
+T035,Golden : scripts MAME (débogueur + Lua) et runner PowerShell,60,T034,docs/tasks/T035.md
+T036,"Golden : valider MAME 0.287, le romset et l'API Lua des ports",59,T035,docs/tasks/T036.md
+T037,Golden : valider la trace CPU MAME contre l'émulateur sur 3 images,58,T036,docs/tasks/T037.md
+T038,Golden : valider le dump vidéo MAME (taille brute et 60 CRC),57,T037,docs/tasks/T038.md
+T039,Golden : premier WAV MAME et comparaison de format avec l'émulateur,56,T038,docs/tasks/T039.md
+T040,"Campagne 1 : trace CPU 700 images, MAME contre émulateur (registres puis tstate)",55,T039,docs/tasks/T040.md
+T041,Campagne 2 : accès bus 700 images (contenu puis timing),54,T040,docs/tasks/T041.md
+T042,"Campagne 3 : CRC vidéo 700 images, MAME contre émulateur",53,T041,docs/tasks/T042.md
+T050,Mesure : date exacte des écritures 7004 (étoiles) vue par MAME et par l'émulateur,52,T042,docs/tasks/T050.md
