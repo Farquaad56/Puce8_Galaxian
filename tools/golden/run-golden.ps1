@@ -30,7 +30,9 @@ if ($Mode -in 'cpu','all') {
   if (Test-Path $raw) { Move-Item -Force $raw golden\mame_raw.log }
   Get-Content golden\mame_raw.log | Where-Object { $_ -like 'C *' } | Set-Content golden\mame_cpu.log -Encoding ascii
   Get-Content golden\mame_raw.log | Where-Object { $_ -like 'B *' } | Set-Content golden\mame_bus.log -Encoding ascii
-  & $Cli trace-cpu $zip --frames $Frames --inputs $Inputs --out golden\emu_cpu.log
+  # MAME n'enregistre pas l'instruction à l'adresse 0000 (la trace démarre après elle) : on écarte la première ligne C de l'émulateur.
+  & $Cli trace-cpu $zip --frames $Frames --inputs $Inputs --out golden\emu_cpu_full.log
+  Get-Content golden\emu_cpu_full.log | Select-Object -Skip 1 | Set-Content golden\emu_cpu.log -Encoding ascii
   & $Cli trace-bus $zip --frames $Frames --inputs $Inputs --out golden\emu_bus.log
   Write-Host 'Logs MAME et émulateur générés dans golden\ (mame_cpu.log, mame_bus.log, emu_cpu.log, emu_bus.log).'
 }
