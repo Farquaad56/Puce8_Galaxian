@@ -5,3 +5,12 @@
 /golden/*.wav
 /golden/*.zst
 *.zip
+/cfg/
+/snap/
+/golden/mamecfg/
+/golden/ref/
+/golden/*.ppm
+/golden/*.txt
+/golden/*.py
+/golden/*.cut
+/golden/*.f
