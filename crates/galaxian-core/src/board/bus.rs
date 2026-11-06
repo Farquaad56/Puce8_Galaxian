@@ -24,8 +24,7 @@ impl Bus for Board {
 
     fn write(&mut self, addr: u16, data: u8) {
         self.record(addr, data, true);
-        let vpos = self.vpos();
-        let frame = self.mame_frame();
+        let (vpos, hpos, frame) = self.bus_stamp();
         match addr {
             0x4000..=0x47ff => self.ram[(addr & 0x3ff) as usize] = data,
             0x5000..=0x57ff => self
@@ -63,7 +62,6 @@ impl Bus for Board {
             0x7000..=0x77ff => match addr & 7 {
                 1 => self.irq_enable_w(data),
                 4 => {
-                    let hpos = self.hpos();
                     self.video.write_stars_enable(data, vpos, hpos, frame);
                 }
                 6 => self.video.write_flip_x(data, vpos, frame),

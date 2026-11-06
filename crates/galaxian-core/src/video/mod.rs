@@ -89,6 +89,14 @@ impl Video {
         self.next_row = last + 1;
     }
 
+    /// Rendu déclenché par une écriture : MAME ne met pas l'image à jour pendant le VBLANK
+    /// (lignes 240..263 : `finish_frame` a déjà tout rendu et la nouvelle image n'a pas commencé).
+    fn render_for_write(&mut self, vpos: u32, frame: u32) {
+        if vpos <= LAST_VISIBLE_LINE {
+            self.render_until(vpos, frame);
+        }
+    }
+
     fn stars_update_origin(&mut self, frame: u32) {
         if frame != self.star_origin_frame {
             let per_frame_delta: i32 = if self.flip_x { 1 } else { -1 };
@@ -104,19 +112,19 @@ impl Video {
     // ---------------------------------------------------------------- écritures
 
     pub fn write_vram(&mut self, offset: usize, data: u8, vpos: u32, frame: u32) {
-        self.render_until(vpos, frame);
+        self.render_for_write(vpos, frame);
         self.vram[offset & 0x3ff] = data;
     }
 
     pub fn write_objram(&mut self, offset: usize, data: u8, vpos: u32, frame: u32) {
-        self.render_until(vpos, frame);
+        self.render_for_write(vpos, frame);
         self.objram[offset & 0xff] = data;
     }
 
     pub fn write_flip_x(&mut self, data: u8, vpos: u32, frame: u32) {
         let new = data & 1 != 0;
         if self.flip_x != new {
-            self.render_until(vpos, frame);
+            self.render_for_write(vpos, frame);
             self.stars_update_origin(frame);
             self.flip_x = new;
         }
@@ -125,7 +133,7 @@ impl Video {
     pub fn write_flip_y(&mut self, data: u8, vpos: u32, frame: u32) {
         let new = data & 1 != 0;
         if self.flip_y != new {
-            self.render_until(vpos, frame);
+            self.render_for_write(vpos, frame);
             self.flip_y = new;
         }
     }
@@ -134,7 +142,7 @@ impl Video {
     pub fn write_stars_enable(&mut self, data: u8, vpos: u32, hpos: u32, frame: u32) {
         let new = data & 1 != 0;
         if self.stars_enabled != new {
-            self.render_until(vpos, frame);
+            self.render_for_write(vpos, frame);
         }
         if !self.stars_enabled && new {
             let v = STAR_RNG_PERIOD as i32 - (vpos as i32 * 512 + hpos as i32);

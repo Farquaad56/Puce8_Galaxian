@@ -93,6 +93,14 @@ impl Board {
         ((self.tstate + u64::from(224 * T_PER_LINE)) / u64::from(T_PER_FRAME)) as u32
     }
 
+    /// (vpos, hpos, numéro d'image) à la date où MAME voit l'accès bus (2 T avant la fin du cycle).
+    fn bus_stamp(&self) -> (u32, u32, u32) {
+        let t = self.tstate.saturating_sub(u64::from(BUS_STAMP_LAG_T));
+        let ft = ((t + u64::from(SCREEN_PHASE_T)) % u64::from(T_PER_FRAME)) as u32;
+        let frame = ((t + u64::from(224 * T_PER_LINE)) / u64::from(T_PER_FRAME)) as u32;
+        (ft / T_PER_LINE, (ft % T_PER_LINE) * MASTER_PER_T, frame)
+    }
+
     fn record(&mut self, addr: u16, data: u8, write: bool) {
         if self.log.is_some() {
             // MAME date l'accès bus 2 T-states avant la fin du cycle machine (calibré sur le golden).

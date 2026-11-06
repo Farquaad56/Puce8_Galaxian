@@ -61,7 +61,7 @@ emu.register_frame_done(function()
     vf:write(pixels)
   end
   apply_inputs(n)
-  if n >= frames - 1 then
+  if n >= frames then
     if vf then vf:close() end
     manager.machine:exit()
   end
