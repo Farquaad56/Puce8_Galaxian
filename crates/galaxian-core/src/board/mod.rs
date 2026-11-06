@@ -95,11 +95,14 @@ impl Board {
 
     fn record(&mut self, addr: u16, data: u8, write: bool) {
         if self.log.is_some() {
+            // MAME date l'accès bus 2 T-states avant la fin du cycle machine (calibré sur le golden).
+            let t = self.tstate.saturating_sub(u64::from(BUS_STAMP_LAG_T));
+            let ft = ((t + u64::from(SCREEN_PHASE_T)) % u64::from(T_PER_FRAME)) as u32;
             let ev = BusEvent {
                 frame: self.tstate / u64::from(T_PER_FRAME),
-                tstate: self.tstate,
-                vpos: self.vpos(),
-                hpos: self.hpos(),
+                tstate: t,
+                vpos: ft / T_PER_LINE,
+                hpos: (ft % T_PER_LINE) * MASTER_PER_T,
                 addr,
                 data,
                 write,

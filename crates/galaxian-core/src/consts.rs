@@ -38,6 +38,9 @@ pub const SCREEN_PHASE_T: u32 = 240 * T_PER_LINE;
 /// Avance (en T-states) de la ligne NMI sur le début du VBLANK, calibrée sur la trace MAME 0.287.
 pub const NMI_LEAD_T: u32 = 1;
 
+/// Décalage (T-states) entre la date de l'accès bus dans la trace MAME et la fin du cycle machine.
+pub const BUS_STAMP_LAG_T: u32 = 2;
+
 #[cfg(test)]
 mod tests {
     use super::*;
